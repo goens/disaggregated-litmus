@@ -1,10 +1,13 @@
 import copy
 import utils
 import cvc5
+import litmus
+import itertools
 from cvc5 import Kind
 
+MAX_CONST = 2
 
-if __name__ == "__main__":
+def find_assertion(transactions : list[litmus.Transaction]) -> litmus.Litmus:
     slv = cvc5.Solver()
     # required options
     slv.setOption("sygus", "true")
@@ -20,8 +23,19 @@ if __name__ == "__main__":
     # Cond := Term <= Term | Cond && Cond | ! Cond | (Cond)
 
     # declare input variables for the function-to-synthesize
-    x = slv.mkVar(integer, "x")
-    y = slv.mkVar(integer, "y")
+    variable_idxs = []
+    for transaction in transactions:
+        for variable in transaction.variables():
+            if variable not in variable_idxs:
+                variable_idxs.append(variable)
+
+    register_idxs = []
+    for transaction in transactions:
+        for register in transaction.registers():
+            if register not in register_idxs:
+                register_idxs.append(register)
+
+    variables = [ slv.mkVar(integer, f"x{i}") for i in variable_idxs ]
 
     # declare the grammar
     cond = slv.mkVar(boolean, "Cond")
@@ -37,32 +51,37 @@ if __name__ == "__main__":
     conj = slv.mkTerm(Kind.AND, cond, cond)
 
     # create the grammar object
-    grammar = slv.mkGrammar([x,y], [cond, term])
+    grammar = slv.mkGrammar(variables, [cond, term])
 
     # bind each non-terminal to its rules
     grammar.addRules(cond, [neg,conj,eq,leq])
-    grammar.addRules(term, [x,y,const_i(0),const_i(1),const_i(2), ite])
+    grammar.addRules(term, [*variables,*[const_i(i) for i in range(1, MAX_CONST + 1)], ite])
 
     # add parameters as rules for the start symbol. Similar to "(Variable Int)"
     grammar.addAnyVariable(cond)
 
     # declare the functions-to-synthesize
-    assertion = slv.synthFun("assertion", [x,y], boolean, grammar)
-
-
-    # declare universal variables.
-    varX = slv.declareSygusVar("x", integer)
-    varY = slv.declareSygusVar("y", integer)
+    assertion = slv.synthFun("assertion", variables, boolean, grammar)
 
     # add positive constraints
-    for i in range(1, 3):
-        slv.addSygusConstraint(
-              slv.mkTerm(Kind.APPLY_UF, assertion, slv.mkInteger(i), slv.mkInteger(i)))
+    for p in itertools.permutations(transactions):
+        context = litmus.Context()
+        for transaction in p:
+            # mutate context
+            transaction.execute(context)
+        variable_values = [context.lookup_variable(variable) for variable in variable_idxs]
+        values_cvc5 = list(map(slv.mkInteger, variable_values))
+        slv.addSygusConstraint(slv.mkTerm(Kind.APPLY_UF, assertion, *values_cvc5))
     # negative constraints
+    statements = itertools.chain.from_iterable([ t.statements for t in transactions ])
     values = []
-    for i in range(0, 3):
-        for j in range(0, 3):
-            values.append(slv.mkTerm(Kind.NOT,slv.mkTerm(Kind.APPLY_UF, assertion, slv.mkInteger(i), slv.mkInteger(j))))
+    for p in itertools.permutations(statements):
+        context = litmus.Context()
+        for statement in p:
+            # mutate context
+            statement.execute(context)
+        varible_values = [slv.mkInteger(context.lookup_variable(variable)) for variable in variable_idxs]
+        values.append(slv.mkTerm(Kind.NOT,slv.mkTerm(Kind.APPLY_UF, assertion, *varible_values)))
     slv.addSygusConstraint(slv.mkTerm(Kind.OR, *values))
 
     # print solutions if available
@@ -76,3 +95,6 @@ if __name__ == "__main__":
       # (define-fun id4 ((x Int)) Int (+ x (+ x (- x))))
       terms = [assertion]
       utils.print_synth_solutions(terms, slv.getSynthSolutions(terms))
+
+if __name__ == "__main__":
+    find_assertion([litmus.example_transaction1, litmus.example_transaction2])
