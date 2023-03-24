@@ -43,10 +43,10 @@ if __name__ == "__main__":
     sygus.find_assertion([example_transaction3, example_transaction4])
     print("=================================")
 
-    print(example_transaction1)
-    print(example_transaction5)
-    sygus.find_assertion([example_transaction1, example_transaction5])
-    print("=================================")
+    #print(example_transaction1)
+    #print(example_transaction5)
+    #sygus.find_assertion([example_transaction1, example_transaction5])
+    #print("=================================")
 
     print(example_transaction6)
     print(example_transaction7)
