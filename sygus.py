@@ -2,6 +2,7 @@ import copy
 import utils
 import cvc5
 import litmus
+from examples import example_transaction1, example_transaction2, example_transaction3, example_transaction4
 import itertools
 from cvc5 import Kind
 
@@ -12,6 +13,8 @@ def find_assertion(transactions : list[litmus.Transaction]) -> litmus.Litmus:
     # required options
     slv.setOption("sygus", "true")
     slv.setOption("incremental", "false")
+    # slv.setOption("tlimit", "3000")
+    # slv.setOption("rlimit", "3000")
     slv.setLogic("LIA")
     integer = slv.getIntegerSort()
     boolean = slv.getBooleanSort()
@@ -87,14 +90,6 @@ def find_assertion(transactions : list[litmus.Transaction]) -> litmus.Litmus:
     # print solutions if available
 
     if (slv.checkSynth().hasSolution()):
-
-      # Output should be equivalent to:
-      # (define-fun id1 ((x Int)) Int (+ x (+ x (- x))))
-      # (define-fun id2 ((x Int)) Int x)
-      # (define-fun id3 ((x Int)) Int (+ x 0))
-      # (define-fun id4 ((x Int)) Int (+ x (+ x (- x))))
       terms = [assertion]
       utils.print_synth_solutions(terms, slv.getSynthSolutions(terms))
 
-if __name__ == "__main__":
-    find_assertion([litmus.example_transaction1, litmus.example_transaction2])

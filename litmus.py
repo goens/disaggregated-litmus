@@ -12,9 +12,21 @@ from enum import Enum
 class TermType(Enum):
     REGISTER = 1
     CONSTANT = 2
-    OPERATOR_ADD = 3
-    OPERATOR_SUB = 4
-    OPERATOR_MUL = 5
+    OPERATOR = 3
+
+class OperatorType(Enum):
+    ADD = 1
+    SUB = 2
+    MUL = 3
+
+    def __str__(self):
+        if self == OperatorType.ADD:
+            return "+"
+        if self == OperatorType.SUB:
+            return "-"
+        if self == OperatorType.MUL:
+            return "*"
+        return "?"
 
 class ReadWrite(Enum):
     READ = 1
@@ -47,6 +59,9 @@ class Term:
     def __init__(self, term_type, value, children=None):
         self.term_type = term_type
         self.value = value
+        if term_type == TermType.OPERATOR:
+            assert(type(children) == list)
+            assert(type(value) == OperatorType)
         if children is None:
             self.children = []
         else:
@@ -57,12 +72,8 @@ class Term:
             return f"r{self.value}"
         if self.term_type == TermType.CONSTANT:
             return f"{self.value}"
-        if self.term_type == TermType.OPERATOR_ADD:
-            return f"({self.children[0]} + {self.children[1]})"
-        if self.term_type == TermType.OPERATOR_SUB:
-            return f"({self.children[0]} - {self.children[1]})"
-        if self.term_type == TermType.OPERATOR_MUL:
-            return f"({self.children[0]} * {self.children[1]})"
+        if self.term_type == TermType.OPERATOR:
+            return f"({self.children[0]} {self.value} {self.children[1]})"
 
     def __eq__(self, other):
         return self.term_type == other.term_type and self.value == other.value and self.children == other.children
@@ -72,7 +83,7 @@ class Term:
             return [self.value]
         if self.term_type == TermType.CONSTANT:
             return []
-        if self.term_type == TermType.OPERATOR_ADD or self.term_type == TermType.OPERATOR_SUB or self.term_type == TermType.OPERATOR_MUL:
+        if self.term_type == TermType.OPERATOR:
             lhs = self.children[0].registers()
             rhs = self.children[1].registers()
             res = []
@@ -89,12 +100,15 @@ class Term:
             return context.lookup_register(self.value)
         if self.term_type == TermType.CONSTANT:
             return self.value
-        if self.term_type == TermType.OPERATOR_ADD:
-            return self.children[0].execute(context) + self.children[1].execute(context)
-        if self.term_type == TermType.OPERATOR_SUB:
-            return self.children[0].execute(context) - self.children[1].execute(context)
-        if self.term_type == TermType.OPERATOR_MUL:
-            return self.children[0].execute(context) * self.children[1].execute(context)
+        if self.term_type == TermType.OPERATOR:
+            lhs = self.children[0].execute(context)
+            rhs = self.children[1].execute(context)
+            if self.value == OperatorType.ADD:
+                return lhs + rhs
+            if self.value == OperatorType.SUB:
+                return lhs - rhs
+            if self.value == OperatorType.MUL:
+                return lhs * rhs
 
 
 class Statement:
@@ -129,7 +143,7 @@ class Statement:
 
     def execute(self,context): #mutate the context...
         if self.readwrite == ReadWrite.READ:
-            context.registers[self.lhs] = context.lookp_variable(self.rhs)
+            context.registers[self.lhs] = context.lookup_variable(self.rhs)
         elif self.readwrite == ReadWrite.WRITE:
             rhs = self.rhs.execute(context)
             context.variables[self.lhs] = rhs
@@ -202,16 +216,3 @@ class Litmus:
         res += f"assert({self.assertion});"
 
 
-example_transaction1 = Transaction([Statement(ReadWrite.WRITE, 0, Term(TermType.CONSTANT, 1)),
-                                    Statement(ReadWrite.WRITE, 1, Term(TermType.CONSTANT, 1))])
-example_transaction2 = Transaction([Statement(ReadWrite.WRITE, 0, Term(TermType.CONSTANT, 2)),
-                                    Statement(ReadWrite.WRITE, 1, Term(TermType.CONSTANT, 2))])
-if __name__ == "__main__":
-    x = Term(TermType.REGISTER, 0)
-    y = Term(TermType.REGISTER, 1)
-    one = Term(TermType.CONSTANT, 1)
-    two = Term(TermType.CONSTANT, 2)
-
-
-    print(example_transaction1)
-    print(example_transaction2)
