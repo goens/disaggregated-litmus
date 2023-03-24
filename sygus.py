@@ -27,8 +27,8 @@ def find_assertion(transactions : list[ts.Transaction]):
     # required options
     slv.setOption("sygus", "true")
     slv.setOption("incremental", "false")
-    slv.setOption("tlimit", "3000")
-    slv.setOption("rlimit", "3000")
+    slv.setOption("tlimit", "10000")
+    slv.setOption("rlimit", "10000")
     slv.setLogic("LIA")
     integer = slv.getIntegerSort()
     boolean = slv.getBooleanSort()
@@ -81,25 +81,37 @@ def find_assertion(transactions : list[ts.Transaction]):
     assertion = slv.synthFun("assertion", variables, boolean, grammar)
 
     # add positive constraints
+    positive_constraints = []
     for p in itertools.permutations(transactions):
         context = ts.Context()
         for transaction in p:
             # mutate context
             transaction.execute(context)
         variable_values = [context.lookup_variable(variable) for variable in variable_idxs]
-        values_cvc5 = list(map(slv.mkInteger, variable_values))
-        slv.addSygusConstraint(slv.mkTerm(Kind.APPLY_UF, assertion, *values_cvc5))
+        if variable_values not in positive_constraints:
+            positive_constraints.append(variable_values)
+            values_cvc5 = list(map(slv.mkInteger, variable_values))
+            slv.addSygusConstraint(slv.mkTerm(Kind.APPLY_UF, assertion, *values_cvc5))
     # negative constraints
     statements = itertools.chain.from_iterable([ t.statements for t in transactions ])
     values = []
+    negative_constraints = []
     for p in itertools.permutations(statements):
         context = ts.Context()
         for statement in p:
             # mutate context
             statement.execute(context)
-        varible_values = [slv.mkInteger(context.lookup_variable(variable)) for variable in variable_idxs]
-        values.append(slv.mkTerm(Kind.NOT,slv.mkTerm(Kind.APPLY_UF, assertion, *varible_values)))
-    slv.addSygusConstraint(slv.mkTerm(Kind.OR, *values))
+        variable_values = [context.lookup_variable(variable) for variable in variable_idxs]
+        if variable_values not in negative_constraints and variable_values not in positive_constraints:
+            negative_constraints.append(variable_values)
+            values_cvc5 = list(map(slv.mkInteger, variable_values))
+            values.append(slv.mkTerm(Kind.NOT,slv.mkTerm(Kind.APPLY_UF, assertion, *values_cvc5)))
+    if len(values) == 0:
+        return None # No negative constraints; Can't disambiguate with an assertion.
+    elif len(values) == 1:
+        slv.addSygusConstraint(values[0])
+    else:
+        slv.addSygusConstraint(slv.mkTerm(Kind.OR, *values))
 
     if (slv.checkSynth().hasSolution()):
         terms = [assertion]

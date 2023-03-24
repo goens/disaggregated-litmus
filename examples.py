@@ -41,10 +41,10 @@ if __name__ == "__main__":
     print(litmus2)
     print("=================================")
 
-    #litums3 = litmus.Litmus([example_transaction1, example_transaction5])
-    #print(litmus3)
-    #print("=================================")
-
     litmus4 = litmus.Litmus([example_transaction6, example_transaction7])
     print(litmus4)
+    print("=================================")
+
+    litmus3 = litmus.Litmus([example_transaction1, example_transaction5])
+    print(litmus3)
     print("=================================")

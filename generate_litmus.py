@@ -49,10 +49,12 @@ def generate_litmus(num_variables=3, num_transactions=2, max_statements=3) -> Li
     transactions = []
     for t in range(num_transactions):
         transactions.append(generate_transaction(num_variables,max_statements))
-    return Litmus(transactions, assertion="?")
+    return Litmus(transactions)
 
 if __name__ == "__main__":
     random.seed(0)
-    for _ in range(10):
-      print(generate_litmus())
-      print("=================")
+    for _ in range(100):
+      litmus = generate_litmus()
+      if litmus.assertion is not None:
+          print(litmus)
+          print("=================")
