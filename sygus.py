@@ -1,20 +1,34 @@
 import copy
-import utils
 import cvc5
-import litmus
+import transactions as ts
 from examples import example_transaction1, example_transaction2, example_transaction3, example_transaction4
 import itertools
 from cvc5 import Kind
 
 MAX_CONST = 2
 
-def find_assertion(transactions : list[litmus.Transaction]) -> litmus.Litmus:
+def define_fun_to_string(f, body):
+    assert(f.getSort().isFunction())
+    assert(f.getSort().getFunctionCodomainSort().isBoolean())
+    result += ") " + str(sort) + " " + str(body) + ")"
+    return result
+
+def get_synth_solutions(terms, sols):
+    for i in range(0, len(terms)):
+        params = []
+        body = sols[i]
+        if sols[i].getKind() == Kind.LAMBDA:
+            if sols[i].getSort().getFunctionCodomainSort().isBoolean():
+                return(str(sols[i][1]))
+    return None
+
+def find_assertion(transactions : list[ts.Transaction]):
     slv = cvc5.Solver()
     # required options
     slv.setOption("sygus", "true")
     slv.setOption("incremental", "false")
-    # slv.setOption("tlimit", "3000")
-    # slv.setOption("rlimit", "3000")
+    slv.setOption("tlimit", "3000")
+    slv.setOption("rlimit", "3000")
     slv.setLogic("LIA")
     integer = slv.getIntegerSort()
     boolean = slv.getBooleanSort()
@@ -38,7 +52,7 @@ def find_assertion(transactions : list[litmus.Transaction]) -> litmus.Litmus:
             if register not in register_idxs:
                 register_idxs.append(register)
 
-    variables = [ slv.mkVar(integer, f"x{i}") for i in variable_idxs ]
+    variables = [ slv.mkVar(integer, f"X{i}") for i in variable_idxs ]
 
     # declare the grammar
     cond = slv.mkVar(boolean, "Cond")
@@ -68,7 +82,7 @@ def find_assertion(transactions : list[litmus.Transaction]) -> litmus.Litmus:
 
     # add positive constraints
     for p in itertools.permutations(transactions):
-        context = litmus.Context()
+        context = ts.Context()
         for transaction in p:
             # mutate context
             transaction.execute(context)
@@ -79,7 +93,7 @@ def find_assertion(transactions : list[litmus.Transaction]) -> litmus.Litmus:
     statements = itertools.chain.from_iterable([ t.statements for t in transactions ])
     values = []
     for p in itertools.permutations(statements):
-        context = litmus.Context()
+        context = ts.Context()
         for statement in p:
             # mutate context
             statement.execute(context)
@@ -87,9 +101,6 @@ def find_assertion(transactions : list[litmus.Transaction]) -> litmus.Litmus:
         values.append(slv.mkTerm(Kind.NOT,slv.mkTerm(Kind.APPLY_UF, assertion, *varible_values)))
     slv.addSygusConstraint(slv.mkTerm(Kind.OR, *values))
 
-    # print solutions if available
-
     if (slv.checkSynth().hasSolution()):
-      terms = [assertion]
-      utils.print_synth_solutions(terms, slv.getSynthSolutions(terms))
-
+        terms = [assertion]
+        return get_synth_solutions(terms, slv.getSynthSolutions(terms))

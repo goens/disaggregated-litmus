@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-from litmus import Transaction,Statement,ReadWrite,Term,TermType,OperatorType
-import sygus
+from transactions import Transaction,Statement,ReadWrite,Term,TermType,OperatorType
+import litmus
 
 x = Term(TermType.REGISTER, 0)
 y = Term(TermType.REGISTER, 1)
@@ -33,22 +33,18 @@ example_transaction7 = Transaction([Statement(ReadWrite.READ,  0, 0), # Read X
                                     Statement(ReadWrite.WRITE, 2, Term(TermType.OPERATOR, OperatorType.ADD, [x, one]))])
 
 if __name__ == "__main__":
-    print(example_transaction1)
-    print(example_transaction2)
-    sygus.find_assertion([example_transaction1, example_transaction2])
+    litmus1 = litmus.Litmus([example_transaction1, example_transaction2])
+    print(litmus1)
     print("=================================")
 
-    print(example_transaction3)
-    print(example_transaction4)
-    sygus.find_assertion([example_transaction3, example_transaction4])
+    litmus2 = litmus.Litmus([example_transaction3, example_transaction4])
+    print(litmus2)
     print("=================================")
 
-    #print(example_transaction1)
-    #print(example_transaction5)
-    #sygus.find_assertion([example_transaction1, example_transaction5])
+    #litums3 = litmus.Litmus([example_transaction1, example_transaction5])
+    #print(litmus3)
     #print("=================================")
 
-    print(example_transaction6)
-    print(example_transaction7)
-    sygus.find_assertion([example_transaction6, example_transaction7])
+    litmus4 = litmus.Litmus([example_transaction6, example_transaction7])
+    print(litmus4)
     print("=================================")
