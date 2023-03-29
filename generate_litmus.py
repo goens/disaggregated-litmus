@@ -37,8 +37,10 @@ def generate_write(local_variables : int, global_variables : int) -> Statement:
 def generate_transaction(num_variables : int, max_statements : int) -> Transaction:
     local = 0
     statements = []
-    for _ in range(random.choice(range(1,max_statements))):
-      if random.random() < 0.5: #Read
+    num_statements = random.choice(range(1,max_statements))
+    for i in range(num_statements):
+      #Read/write with 50% probability, but always write at the end
+      if random.random() < 0.5 and (i != num_statements - 1):
         statements.append(generate_read(local, num_variables))
         local += 1
       else: #Write
@@ -47,14 +49,14 @@ def generate_transaction(num_variables : int, max_statements : int) -> Transacti
 
 def generate_litmus(num_variables=3, num_transactions=2, max_statements=3) -> Litmus:
     transactions = []
-    for t in range(num_transactions):
+    for _ in range(num_transactions):
         transactions.append(generate_transaction(num_variables,max_statements))
     return Litmus(transactions)
 
 if __name__ == "__main__":
     random.seed(0)
     for _ in range(100):
-      litmus = generate_litmus()
+      litmus = generate_litmus(num_transactions=2)
       if litmus.assertion is not None:
           print(litmus)
           print("=================")
