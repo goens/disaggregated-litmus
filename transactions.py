@@ -55,6 +55,9 @@ class Context:
         for variable in self.variables:
             print(f"X{variable} = {self.variables[variable]}")
 
+    def __eq__(self, other):
+        return self.registers == other.registers and self.variables == other.variables
+
 class Term:
     def __init__(self, term_type, value, children=None):
         self.term_type = term_type
@@ -125,9 +128,9 @@ class Statement:
 
     def __repr__(self):
         if self.readwrite == ReadWrite.READ:
-            return f"r{self.lhs} = X{self.rhs}"
+            return f"Read r{self.lhs} = X{self.rhs}"
         elif self.readwrite == ReadWrite.WRITE:
-            return f"X{self.lhs} = {self.rhs}"
+            return f"Write X{self.lhs} = {self.rhs}"
 
     def registers(self) -> list[int]:
         if self.readwrite == ReadWrite.READ:

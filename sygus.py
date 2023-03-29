@@ -3,9 +3,11 @@ import cvc5
 import transactions as ts
 from examples import example_transaction1, example_transaction2, example_transaction3, example_transaction4
 import itertools
+from copy import deepcopy
 from cvc5 import Kind
 
 MAX_CONST = 2
+MAX_STATES = 10
 
 def define_fun_to_string(f, body):
     assert(f.getSort().isFunction())
@@ -81,31 +83,52 @@ def find_assertion(transactions : list[ts.Transaction]):
     assertion = slv.synthFun("assertion", variables, boolean, grammar)
 
     # add positive constraints
+    # initialize with empty context
+    #ypositive_constraints = [[0]*len(variable_idxs)]
     positive_constraints = []
-    for p in itertools.permutations(transactions):
-        context = ts.Context()
-        for transaction in p:
+    contexts = [ts.Context()]
+    seen = []
+    iters = 0
+    while len(contexts) > 0 and iters < MAX_STATES:
+        iters += 1
+        context = contexts.pop()
+        seen.append(context)
+        for transaction in transactions:
             # mutate context
-            transaction.execute(context)
-        variable_values = [context.lookup_variable(variable) for variable in variable_idxs]
-        if variable_values not in positive_constraints:
-            positive_constraints.append(variable_values)
-            values_cvc5 = list(map(slv.mkInteger, variable_values))
-            slv.addSygusConstraint(slv.mkTerm(Kind.APPLY_UF, assertion, *values_cvc5))
+            new_context = deepcopy(context)
+            transaction.execute(new_context)
+            if new_context not in seen:
+                contexts = [new_context] + contexts
+            variable_values = [new_context.lookup_variable(variable) for variable in variable_idxs]
+            if variable_values not in positive_constraints:
+                positive_constraints.append(variable_values)
+                values_cvc5 = list(map(slv.mkInteger, variable_values))
+                #print(f"Adding positive constraint: {variable_values}")
+                slv.addSygusConstraint(slv.mkTerm(Kind.APPLY_UF, assertion, *values_cvc5))
+
     # negative constraints
     statements = itertools.chain.from_iterable([ t.statements for t in transactions ])
     values = []
     negative_constraints = []
-    for p in itertools.permutations(statements):
-        context = ts.Context()
-        for statement in p:
+    contexts = [ts.Context()]
+    seen = []
+    iters = 0
+
+    while len(contexts) > 0 and iters < MAX_STATES:
+        iters += 1
+        context = contexts.pop()
+        for statement in statements:
             # mutate context
-            statement.execute(context)
-        variable_values = [context.lookup_variable(variable) for variable in variable_idxs]
-        if variable_values not in negative_constraints and variable_values not in positive_constraints:
-            negative_constraints.append(variable_values)
-            values_cvc5 = list(map(slv.mkInteger, variable_values))
-            values.append(slv.mkTerm(Kind.NOT,slv.mkTerm(Kind.APPLY_UF, assertion, *values_cvc5)))
+            new_context = deepcopy(context)
+            statement.execute(new_context)
+            if new_context not in seen:
+                contexts = [new_context] + contexts
+            variable_values = [new_context.lookup_variable(variable) for variable in variable_idxs]
+            if variable_values not in negative_constraints and variable_values not in positive_constraints:
+                negative_constraints.append(variable_values)
+                #print(f"Adding negative constraint: {variable_values}")
+                values_cvc5 = list(map(slv.mkInteger, variable_values))
+                values.append(slv.mkTerm(Kind.NOT,slv.mkTerm(Kind.APPLY_UF, assertion, *values_cvc5)))
     if len(values) == 0:
         return None # No negative constraints; Can't disambiguate with an assertion.
     elif len(values) == 1:
